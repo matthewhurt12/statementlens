@@ -1,0 +1,2270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Enforces the privacy promise even when this file is hosted somewhere without custom headers. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>StatementLens — Private Bank Statement Analyzer</title>
+  <meta name="description" content="Analyze your bank statement CSV privately. No upload, no account, no server. Everything stays in your browser.">
+
+  <link rel="canonical" href="https://matthewhurt12.github.io/statementlens/">
+
+  <!-- Open Graph (Facebook, LinkedIn, Signal, iMessage, Slack, Discord link previews) -->
+  <meta property="og:type"        content="website">
+  <meta property="og:title"       content="StatementLens — Private Bank Statement Analyzer">
+  <meta property="og:description" content="Drop your bank’s CSV export. Get spending charts and category breakdowns instantly. No upload, no account, no server — everything runs in your browser.">
+  <meta property="og:url" content="https://matthewhurt12.github.io/statementlens/">
+  <!-- Add a 1200×630 og:image URL after deployment. -->
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card"        content="summary">
+  <meta name="twitter:title"       content="StatementLens — Private Bank Statement Analyzer">
+  <meta name="twitter:description" content="Drop your bank’s CSV export. Spending charts and categories instantly. No upload, no account — runs entirely in your browser.">
+  <!-- Add twitter:image after deployment. -->
+
+  <!-- Inline SVG favicon (no network request) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+
+  <!-- Search engine hints -->
+  <meta name="robots" content="index, follow">
+  <meta name="keywords" content="bank statement analyzer, CSV spending analysis, private finance tool, no upload, offline, open source">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f9fafb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --income: #16a34a;
+      --expense: #dc2626;
+      --net-pos: #15803d;
+      --net-neg: #b91c1c;
+      --radius: 8px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* ── Privacy bar ── */
+    #privacy-bar {
+      background: #1e3a5f;
+      color: #bfdbfe;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+    #privacy-bar strong { color: #93c5fd; }
+
+    /* ── Header ── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .logo-icon { font-size: 22px; }
+    .logo-name { font-size: 19px; font-weight: 700; color: var(--accent); }
+    .logo-tag { font-size: 13px; color: var(--muted); }
+    .site-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .site-actions a {
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--card);
+    }
+    .site-actions a:hover { background: #eff6ff; border-color: #bfdbfe; }
+    #reset-btn {
+      display: none;
+      margin-left: 0;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    #reset-btn:hover { background: var(--bg); }
+
+    /* ── Main ── */
+    main { max-width: 1160px; margin: 0 auto; padding: 28px 20px; }
+
+    /* ── Drop zone ── */
+    #drop-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 16px;
+      padding: 60px 24px;
+      text-align: center;
+      background: var(--card);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    #drop-zone:hover, #drop-zone.drag-over {
+      border-color: var(--accent);
+      background: #eff6ff;
+    }
+    #drop-zone:focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .drop-icon { font-size: 44px; margin-bottom: 14px; }
+    .drop-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .drop-sub { color: var(--muted); margin-bottom: 22px; font-size: 14px; }
+    #file-input { display: none; }
+    .btn-primary {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .drop-formats { margin-top: 16px; font-size: 12px; color: var(--muted); }
+    .bank-list { margin-top: 8px; font-size: 12px; color: #9ca3af; }
+
+    /* ── Loading ── */
+    #loading-section { text-align: center; padding: 60px; color: var(--muted); font-size: 15px; }
+    .spinner { font-size: 36px; display: block; margin-bottom: 12px; animation: spin 1.2s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Column mapper ── */
+    #map-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      max-width: 580px;
+      margin: 0 auto;
+    }
+    .map-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+    .map-sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .map-row { margin-bottom: 16px; }
+    .map-label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 14px; }
+    .map-select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: #fff;
+      color: var(--text);
+    }
+    .map-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .map-actions { margin-top: 24px; display: flex; gap: 12px; }
+    .btn-secondary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 9px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .btn-secondary:hover { background: var(--bg); }
+
+    /* ── Error ── */
+    #error-section {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+    .error-icon { font-size: 36px; margin-bottom: 10px; }
+    .error-title { font-weight: 600; color: #dc2626; font-size: 17px; margin-bottom: 8px; }
+    .error-msg { color: #7f1d1d; font-size: 14px; margin-bottom: 16px; }
+
+    /* ── Summary cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .s-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .s-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .s-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+    .s-value.income { color: var(--income); }
+    .s-value.expense { color: var(--expense); }
+    .s-value.net-pos { color: var(--net-pos); }
+    .s-value.net-neg { color: var(--net-neg); }
+    .s-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Charts ── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 720px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 18px 14px;
+      min-height: 0;
+    }
+    .chart-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    svg.chart { width: 100%; display: block; height: auto; }
+    .month-bar-group:hover { opacity: 1 !important; }
+    .month-bar-group:focus { opacity: 1 !important; outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* On very narrow screens, make category bars taller for finger-tap */
+    @media (max-width: 480px) {
+      .cat-bar-wrap { height: 22px; }
+      .cat-name { width: 90px; font-size: 12px; }
+      .s-value { font-size: 22px; }
+      .s-card { padding: 14px 16px; }
+    }
+
+    /* ── Category bars ── */
+    .cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 13px; }
+    .cat-name { width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+    .cat-bar-wrap {
+      flex: 1;
+      background: #f3f4f6;
+      border-radius: 4px;
+      height: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+    }
+    .cat-bar-fill { height: 100%; border-radius: 4px; transition: filter 0.1s; }
+    .cat-bar-wrap:hover .cat-bar-fill { filter: brightness(0.9); }
+    .cat-amount {
+      width: 72px;
+      text-align: right;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ── Table ── */
+    .table-header {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .table-label { font-weight: 600; font-size: 14px; }
+    #search-input {
+      flex: 1;
+      min-width: 180px;
+      padding: 6px 11px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    #filter-badge {
+      display: none;
+      background: var(--accent);
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tx-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      overflow-x: auto;
+      margin-bottom: 18px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: var(--bg); }
+    th {
+      padding: 9px 13px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover { color: var(--text); }
+    th.sort-asc::after { content: " ↑"; }
+    th.sort-desc::after { content: " ↓"; }
+    th.sort-none { }
+    td { padding: 8px 13px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8fafc; }
+    .td-date { white-space: nowrap; color: var(--muted); font-size: 12px; width: 105px; }
+    .td-desc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .td-amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 500; width: 90px; }
+    .td-amt.pos { color: var(--income); }
+    .td-amt.neg { color: var(--expense); }
+    .cat-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .cat-pill:hover { filter: brightness(0.93); }
+
+    /* ── Export bar ── */
+    .export-bar { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
+
+    /* ── Bank detected notice ── */
+    #bank-notice {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #sign-convention {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius);
+      color: #78350f;
+      font-size: 13px;
+      margin: -2px 0 14px;
+      padding: 9px 12px;
+    }
+    #sign-convention button {
+      background: none;
+      border: 0;
+      color: #92400e;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    /* ── Footer ── */
+    footer {
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      padding: 28px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .verify-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      max-width: 680px;
+      margin: 0 auto 16px;
+      text-align: left;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .verify-box strong { color: #15803d; }
+    footer p + p { margin-top: 4px; }
+
+    /* ── Bank guide ── */
+    .bank-guide {
+      margin-top: 22px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: left;
+    }
+    .bank-guide summary {
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 500;
+      padding: 4px 0;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .bank-guide summary::-webkit-details-marker { display: none; }
+    .bank-guide[open] summary { margin-bottom: 10px; }
+    .bank-guide summary .arr { display:inline-block; transition: transform 0.2s; }
+    .bank-guide[open] summary .arr { transform: rotate(180deg); }
+    .guide-body {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+    }
+    .guide-body ul { margin: 0; padding: 0 0 0 18px; }
+    .guide-body li {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 7px;
+      line-height: 1.5;
+    }
+    .guide-body li strong { color: var(--text); }
+    .guide-body li:last-child { margin-bottom: 0; }
+
+    /* ── Screen-reader only ── */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ── Skip link (accessibility) ── */
+    .skip-link {
+      position: absolute;
+      top: -40px;
+      left: 6px;
+      background: var(--accent);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 200;
+      transition: top 0.1s;
+    }
+    .skip-link:focus { top: 6px; }
+
+    /* ── Sample data banner ── */
+    #sample-banner {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #92400e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    #sample-banner[hidden] { display: none; }
+    #sample-banner strong { color: #78350f; }
+    #sample-banner button {
+      margin-left: auto;
+      background: none;
+      border: 1px solid #d97706;
+      border-radius: 6px;
+      color: #92400e;
+      font-size: 12px;
+      padding: 3px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #sample-banner button:hover { background: #fef3c7; }
+
+    /* ── "or" divider in drop zone ── */
+    .drop-or {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 18px auto 0;
+      max-width: 300px;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+    .drop-or::before, .drop-or::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e5e7eb;
+    }
+    .btn-sample {
+      display: block;
+      margin: 10px auto 0;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 22px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+    .btn-sample:hover {
+      background: var(--bg);
+      color: var(--text);
+      border-color: #9ca3af;
+    }
+
+    /* ── Print / Save as PDF ── */
+    #print-header {
+      display: none;   /* shown only in print */
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    #print-header h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    #print-header p  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+    @media print {
+      /* Hide everything that isn't the analysis */
+      .skip-link, #privacy-bar, #reset-btn,
+      #drop-section, #loading-section, #map-section, #error-section,
+      #sample-banner, .table-header, .export-bar, footer, #toast,
+      #cat-chart-hint, #monthly-chart-hint, .bank-guide,
+      #bank-notice, #sign-convention { display: none !important; }
+
+      /* Show the print header */
+      #print-header { display: block !important; }
+
+      /* Reset layout for print */
+      body { font-size: 11px; background: #fff; }
+      main { padding: 0 !important; max-width: 100%; }
+      header { padding: 12px 0; border-bottom: 1px solid #e5e7eb; margin-bottom: 16px; }
+      #results-section { display: block !important; }
+
+      /* 2-column chart grid on print (don't collapse to 1 col) */
+      .charts-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+
+      /* 5 summary cards in a row */
+      .summary-grid { grid-template-columns: repeat(5, 1fr) !important; gap: 10px !important; }
+      .s-value { font-size: 18px !important; }
+      .s-card { padding: 12px 14px !important; }
+
+      /* Table: full width, all rows (printReport() expands beyond the 300-row display cap) */
+      .table-wrap { overflow: visible !important; box-shadow: none !important; }
+      table { font-size: 11px; }
+      thead { background: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      /* Avoid page breaks inside cards and charts */
+      .s-card, .chart-card, .table-wrap { break-inside: avoid; }
+      .summary-grid, .charts-grid { break-inside: avoid; }
+
+      /* Keep category bar colors */
+      .cat-bar-fill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1f2937;
+      color: #fff;
+      padding: 11px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      display: none;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to results</a>
+
+<div id="privacy-bar">
+  🔒 <strong>Your data never leaves this browser tab.</strong>
+  No server. No account. No tracking. Refresh the page to clear everything.
+</div>
+
+<header>
+  <span class="logo-icon">📊</span>
+  <span class="logo-name">StatementLens</span>
+  <span class="logo-tag">Private bank statement analyzer</span>
+  <nav class="site-actions" aria-label="Project links">
+    <a href="https://github.com/matthewhurt12/statementlens" target="_blank" rel="noreferrer">Source</a>
+    <a href="https://github.com/matthewhurt12/statementlens/releases/latest/download/statementlens.html">Download offline</a>
+  </nav>
+  <button id="reset-btn" onclick="resetApp()" aria-label="Load another file">← Load another file</button>
+</header>
+
+<main id="main-content">
+
+  <!-- Drop section -->
+  <section id="drop-section">
+    <div id="drop-zone" role="button" tabindex="0"
+         aria-label="Drop your bank CSV file here or click to choose a file">
+      <div class="drop-icon">🏦</div>
+      <div class="drop-title">Drop your bank statement here</div>
+      <div class="drop-sub">
+        Download a CSV from your bank's transaction history page,<br>then drop it here or click below.
+      </div>
+      <label class="btn-primary" for="file-input" style="cursor:pointer;">Choose CSV file</label>
+      <input type="file" id="file-input" accept=".csv,text/csv"
+             aria-label="Choose a bank statement CSV file">
+      <div class="drop-formats">Accepts .csv files · Comma, semicolon, or tab delimited · Works offline · No data leaves this tab</div>
+      <div class="bank-list">Recognizes common Chase · Bank of America · Capital One · Ally · Wells Fargo · Discover · Citibank · American Express · TD Bank · USAA · and generic layouts</div>
+
+      <div class="drop-or">or</div>
+      <button class="btn-sample" onclick="loadSampleData()">
+        &#9654; Try with 6 months of sample data
+      </button>
+
+      <details class="bank-guide">
+        <summary>How do I download my bank's CSV? <span class="arr" aria-hidden="true">&#9660;</span></summary>
+        <div class="guide-body">
+          <ul>
+            <li><strong>Chase:</strong> Sign in → Accounts → <em>Download account activity</em> → choose date range → CSV</li>
+            <li><strong>Bank of America:</strong> Accounts → Transaction history → <em>Download</em> → Comma delimited text</li>
+            <li><strong>Capital One:</strong> Accounts → Transactions → <em>Download transactions</em> → CSV</li>
+            <li><strong>Ally:</strong> Account activity → <em>Download</em> (top right) → CSV</li>
+            <li><strong>Wells Fargo:</strong> Account summary → <em>Download account activity</em> → Comma-Separated Values</li>
+            <li><strong>Other banks:</strong> Look for "Download", "Export", or "Statements" near your transaction history. If unsure, search: <em>[your bank name] export transactions CSV</em>.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- Loading -->
+  <section id="loading-section" hidden>
+    <span class="spinner" aria-hidden="true">⏳</span>
+    Parsing your statement — everything stays in this tab…
+  </section>
+
+  <!-- Column mapper -->
+  <section id="map-section" hidden aria-live="polite">
+    <div class="map-title">Help us read your file</div>
+    <div class="map-sub">
+      We couldn't automatically identify the date, amount, and description columns.
+      Select each one below — sample values from your file are shown to help.
+    </div>
+    <div id="map-preview" style="font-size:12px; color:var(--muted); font-family:monospace;
+         background:var(--bg); border:1px solid var(--border); border-radius:6px;
+         padding:10px; margin-bottom:20px; overflow-x:auto; white-space:pre;"></div>
+
+    <div class="map-row">
+      <label class="map-label" for="col-date">
+        Date column <span style="color:var(--expense)">*</span>
+      </label>
+      <select class="map-select" id="col-date"></select>
+    </div>
+    <div class="map-row">
+      <label class="map-label" for="col-amount">Amount column</label>
+      <select class="map-select" id="col-amount"></select>
+      <div class="map-hint">Negative = expense, positive = income. Leave "Not applicable" if your file has separate Debit/Credit columns.</div>
+    </div>
+    <div class="map-row">
+      <label class="map-label" for="col-debit">Debit column (expenses)</label>
+      <select class="map-select" id="col-debit"></select>
+    </div>
+    <div class="map-row">
+      <label class="map-label" for="col-credit">Credit column (income)</label>
+      <select class="map-select" id="col-credit"></select>
+    </div>
+    <div class="map-row">
+      <label class="map-label" for="col-desc">
+        Description / Merchant column <span style="color:var(--expense)">*</span>
+      </label>
+      <select class="map-select" id="col-desc"></select>
+    </div>
+
+    <div class="map-actions">
+      <button class="btn-primary" onclick="applyColumnMapping()">Analyze Statement</button>
+      <button class="btn-secondary" onclick="resetApp()">Cancel</button>
+    </div>
+  </section>
+
+  <!-- Error -->
+  <section id="error-section" hidden role="alert">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title" id="error-title">Could not read this file</div>
+    <div class="error-msg" id="error-msg"></div>
+    <button class="btn-secondary" onclick="resetApp()">Try another file</button>
+  </section>
+
+  <!-- Results -->
+  <section id="results-section" hidden aria-live="polite" aria-label="Analysis results">
+
+    <h2 id="results-heading" class="sr-only" tabindex="-1">Analysis results</h2>
+
+    <!-- Print header: hidden on screen, visible in print/PDF -->
+    <div id="print-header" aria-hidden="true">
+      <h1>StatementLens — Spending Analysis</h1>
+      <p id="print-date"></p>
+      <p>Analyzed privately in your browser. No data was uploaded to any server.</p>
+    </div>
+
+    <div id="sample-banner" hidden role="note">
+      <span>&#128196; <strong>Sample data</strong> — these are not your real transactions. This is a demo with fictional spending.
+      Drop your own bank CSV above to analyze your actual spending.</span>
+      <button onclick="resetApp()">Load my own CSV</button>
+    </div>
+    <div id="bank-notice"></div>
+    <div id="sign-convention" hidden>
+      Check one purchase below: expenses should show a minus sign.
+      <button type="button" id="flip-signs-btn" onclick="flipAllSigns()">Flip every amount</button>
+      if this credit-card export uses the opposite convention.
+    </div>
+
+    <!-- Summary cards -->
+    <div class="summary-grid" id="summary-grid"></div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Monthly Cash Flow</div>
+        <div id="monthly-chart"></div>
+        <div id="monthly-chart-hint" style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Click any month to filter the transaction table below
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title" id="cat-chart-title">Spending by Category</div>
+        <div id="cat-chart"></div>
+        <div id="cat-chart-hint" style="font-size:11px; color:var(--muted); margin-top:8px;">
+          Click any bar to filter the transaction table below
+        </div>
+      </div>
+    </div>
+
+    <!-- Table header -->
+    <div class="table-header">
+      <span class="table-label">Transactions</span>
+      <label for="search-input" class="sr-only" style="display:none;">Search transactions</label>
+      <input type="search" id="search-input" placeholder="Search descriptions or categories…"
+             oninput="filterTable()" aria-label="Search transactions">
+      <span id="filter-badge" onclick="clearCatFilter()" role="button" tabindex="0"
+            aria-label="Clear category filter" onkeydown="if(event.key==='Enter')clearCatFilter()"></span>
+      <span id="month-badge" onclick="clearMonthFilter()" role="button" tabindex="0"
+            aria-label="Clear month filter" onkeydown="if(event.key==='Enter')clearMonthFilter()"
+            style="display:none;background:#2563eb;color:#fff;padding:3px 10px;border-radius:20px;
+                   font-size:12px;cursor:pointer;white-space:nowrap;"></span>
+      <span class="tx-count" id="tx-count" aria-live="polite"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap" role="region" aria-label="Transactions table">
+      <table id="tx-table" aria-label="Bank transactions">
+        <thead>
+          <tr>
+            <th id="th-date"   onclick="sortBy('date')"   aria-sort="none">Date</th>
+            <th id="th-desc"   onclick="sortBy('desc')"   aria-sort="none">Description</th>
+            <th id="th-cat"    onclick="sortBy('cat')"    aria-sort="none">Category</th>
+            <th id="th-amount" onclick="sortBy('amount')" aria-sort="none" style="text-align:right">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="tx-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Export -->
+    <div class="export-bar">
+      <button class="btn-secondary" onclick="copySummary()">📋 Copy summary text</button>
+      <button class="btn-secondary" onclick="exportCSV()">⬇ Download categorized CSV</button>
+      <button class="btn-secondary" onclick="printReport()">🖨 Print / Save as PDF</button>
+    </div>
+
+  </section>
+</main>
+
+<footer>
+  <div class="verify-box">
+    <strong>🔍 How to verify nothing is uploaded:</strong> Open your browser's Developer Tools
+    (press F12), go to the <em>Network</em> tab, then load your CSV file. You'll see zero
+    requests carrying your data — all processing happens in JavaScript inside this browser tab.
+    Refreshing the page clears everything.
+  </div>
+  <p>StatementLens &mdash; open source, MIT license &mdash; works offline &mdash; no account &mdash; no tracking</p>
+  <p style="margin-top:4px; font-size:12px;">
+    <a href="https://github.com/matthewhurt12/statementlens" target="_blank" rel="noreferrer">Source and issues</a>
+    &middot;
+    <a href="https://github.com/matthewhurt12/statementlens/releases/latest/download/statementlens.html">Download the offline HTML app</a>
+  </p>
+  <p style="margin-top:4px; font-size:12px;">
+    Recognizes common header layouts for Chase, Bank of America, Capital One, Ally,
+    Wells Fargo, Discover, Citibank, American Express, TD Bank, USAA, and generic CSVs.
+    Formats change; verify dates and amount signs. Not affiliated with any bank.
+  </p>
+</footer>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let rawRows       = [];
+let headers       = [];
+let transactions  = [];
+let sortCol       = 'date';
+let sortDir       = -1;       // −1 = desc, 1 = asc
+let catFilter     = null;
+let monthFilter   = null;   // 'YYYY-MM' or null
+let searchTerm    = '';
+let isSampleData  = false;
+let detectedBank  = '';
+let headerRowIdx  = 0;    // which rawRows index is the actual CSV header
+let headerSkipNote = ''; // '(skipped N metadata rows)' or ''
+let signsFlipped   = false;
+
+// ─────────────────────────────────────────────
+// CATEGORIES
+// ─────────────────────────────────────────────
+/* STATEMENTLENS_CORE_START
+ * Pure parsing/categorization/export helpers live inside these markers.
+ * test-logic.js evaluates this exact block, so tests cannot drift from the app.
+ */
+const CATS = {
+  'Food & Drink': {
+    color: '#dc2626', bg: '#fee2e2',
+    kw: ['starbucks','mcdonalds','mcdonald','mc donalds','subway','chipotle','domino','pizza',
+         'burger king','taco bell','wendy','popeyes','chick-fil','chick fil','panera','dunkin',
+         'krispy kreme','olive garden','cheesecake factory','applebee','denny','ihop',
+         'waffle house','sushi','ramen','in-n-out','in n out','five guys','shake shack',
+         'jersey mike','wingstop','little caesar','whataburger','sonic drive','raising cane',
+         'sweetgreen','cava ','chipotle','doordash','grubhub','uber eats','ubereats',
+         'instacart','postmates','door dash','seamless','gopuff','caviar ',
+         'safeway','kroger','publix','aldi','trader joe','whole foods','wholefds','wfm ',
+         'wegmans','food lion','stop & shop','sprouts','market basket','giant food',
+         'vons','ralphs','costco food','fresh market','tst*','tst ',
+         'deli','bakery','cafe','coffee','tea house','juice bar','smoothie',
+         'restaurant','dining','bistro','tavern','grill','kitchen','eatery','diner',
+         'grocery','supermarket','food mart','food market','fast food','food co-op',
+         'seven eleven food','convenience store',
+         // European supermarkets / grocery
+         'lidl','rewe ','edeka','kaufland','netto marken','netto-','aldi suel','aldi nord',
+         'spar ','spar supermarkt','interspar','eurospar','migros','coop ','coop-','coop markt',
+         'carrefour','e.leclerc','leclerc','intermarche','auchan','monoprix','picard',
+         'albert heijn','ah ','jumbo ','plus supermarkt',
+         'tesco','sainsbury','sainsburys','asda ','morrisons','waitrose','marks & spencer',
+         'm&s food','m&s simply food',
+         'billa','merkur','penny markt','netto dk','rema 1000','ica ','coop se',
+         'globus ','real,-','kaufpark','tegut','denn\'s','denns']
+  },
+  'Shopping': {
+    color: '#ea580c', bg: '#ffedd5',
+    kw: ['amzn mktp','amzn mktp us','amazon','wal-mart','wal mart','walmart','target',
+         'ebay','etsy','best buy','bestbuy','home depot','homedepot','lowes',"lowe's",
+         'ikea','costco whse','costco','wayfair','chewy','gap ','h&m','zara','nordstrom',
+         'macy','bloomingdale','kohl','tj maxx','tjmaxx','marshalls','ross dress',
+         'old navy','banana republic','express fashion','forever 21','bath & body',
+         'victoria secret','gamestop','b&h photo','newegg','rei.com','apple store ',
+         'patagonia','nike','adidas','under armour','dick\'s sporting','sport chalet',
+         'academy sports','overstock','petco','petsmart','dollar general','dollar tree',
+         'five below','world market',
+         // European retail / electronics / fashion / drugstores
+         'mediamarkt','media markt','saturn ',
+         'fnac','darty','boulanger',
+         'decathlon','intersport','sport 2000',
+         'primark','new look','next ','river island',
+         'zalando','about you','otto ',
+         'douglas ','the body shop','rituals',
+         'dm-drogerie','dm drogerie','rossmann','mueller ','budni',
+         'galeria','karstadt','c&a ']
+  },
+  'Transport': {
+    color: '#ca8a04', bg: '#fef9c3',
+    kw: ['uber','lyft','parking','exxon','shell oil','bp oil','chevron','citgo','sunoco',
+         'marathon oil','speedway','wawa gas','quiktrip','casey\'s gas','kwik trip',
+         '7-eleven fuel','pilot travel','love\'s fuel','circle k','gasoline','gas station',
+         'metro transit','mbta','mta bus','bart ','cta ','septa','wmata','trimet',
+         'amtrak','greyhound','megabus','flixbus',
+         'delta air','american airlines','united airlines','southwest air','jetblue',
+         'spirit airlines','frontier air','alaska air','allegiant air',
+         'enterprise rent','hertz','avis','budget rent','national car','zipcar','turo',
+         // European transport
+         'deutsche bahn','db regio','db ag ','db fernverkehr','bahn.de',
+         'oebb','sncf','thalys','eurostar','tren renfe','renfe',
+         'ns reizen','ns.nl',
+         'trenitalia','italo','trenord',
+         'flixbus',  // already in main list above but safe duplicate
+         'blablacar','ouigo','transavia',
+         'ryanair','easyjet','wizz air','norwegian air','vueling',
+         'hvv','mvv ','mvg ','vvs ','vrs ']
+  },
+  'Housing': {
+    color: '#16a34a', bg: '#dcfce7',
+    kw: ['rent payment','monthly rent','lease payment','rent pmt','apt rent','landlord',
+         ' rent ','hoa ','hoa fee','homeowner','homeowners ins','home loan',
+         'mortgage','mortgage pmt','property tax','storage unit','u-haul','uhaul',
+         'pods moving','moving company','realty','property management','airbnb','vrbo']
+  },
+  'Healthcare': {
+    color: '#0891b2', bg: '#cffafe',
+    kw: ['cvs pharmacy','cvs/pharmacy','walgreens','rite aid','pharmacy','medical center',
+         'dental','doctor','hospital','clinic','urgent care','kaiser','aetna','cigna',
+         'humana','united health','anthem','bcbs','blue cross','blue shield','optum',
+         'labcorp','quest diagnostics','imaging center','physical therapy','chiropractic',
+         'optometry','vision center','eyecare','eye exam','prescription','rx ']
+  },
+  'Entertainment': {
+    color: '#7c3aed', bg: '#ede9fe',
+    kw: ['netflix','spotify','hulu','disney+','disney plus','apple tv','apple music',
+         'hbo max','hbo now','peacock','paramount+','showtime','starz','crunchyroll',
+         'youtube premium','amazon prime video','tidal','pandora','sirius xm','siriusxm',
+         'movie theater','cinema','regal','amc theater','cinemark','fandango','ticketmaster',
+         'stubhub','vivid seats','seatgeek','concert','museum','zoo','aquarium',
+         'theme park','six flags','cedar point','universal studios','disney world',
+         'bowling','laser tag','mini golf','escape room','trampoline park',
+         'dave & buster','dave and buster','arcade','steam purchase','playstation store',
+         'nintendo eshop','xbox game','epic games','microsoft store games']
+  },
+  'Subscriptions': {
+    color: '#4f46e5', bg: '#e0e7ff',
+    kw: ['amazon web services','aws, inc','aws.amazon',
+         'apple.com/bill','apl*apple','apl*itunes','itunes.com',
+         'google one','google storage','google *gsuite','google workspace',
+         'icloud+','icloud storage','microsoft 365','office 365','adobe creative',
+         'dropbox','box.com','notion ','slack ','zoom ','canva ','figma ','github',
+         'heroku','digitalocean','linode','vultr','cloudflare','namecheap','godaddy',
+         'squarespace','wix ','shopify','mailchimp','zapier','airtable','monday.com',
+         'asana','trello','linear ','1password','lastpass','dashlane','nordvpn',
+         'expressvpn','protonvpn','mullvad','duolingo','audible','kindle unlimited',
+         'scribd','medium ','substack','patreon','masterclass','coursera','udemy',
+         'linkedin learning','skillshare','openai','chatgpt','anthropic','midjourney',
+         'figma ','miro ','loom ','calendly','hubspot']
+  },
+  'Utilities': {
+    color: '#0284c7', bg: '#e0f2fe',
+    kw: ['electric bill','electricity','gas utility','gas bill','water bill','sewer',
+         'utility payment','comcast','xfinity','spectrum ','cox comm','at&t','verizon',
+         't-mobile','tmobile','sprint','metro pcs','cricket wireless','boost mobile',
+         'mint mobile','simple mobile','republic wireless','internet service','broadband',
+         'cable bill','phone bill','cell phone']
+  },
+  'Income': {
+    color: '#15803d', bg: '#dcfce7',
+    kw: ['payroll','direct dep','direct deposit','ach dep','salary','employer',
+         'paycheck','wages','commission','freelance income','consulting',
+         'dividend credit','interest credit','interest earned','refund',
+         'cash back reward','cashback','rebate','stimulus','tax refund','tax ref',
+         'ach credit','wire credit','incoming wire','credit memo',
+         'zelle from','venmo from','transfer from ','deposit from']
+  },
+  'Transfers': {
+    color: '#6b7280', bg: '#f3f4f6',
+    kw: ['zelle payment','venmo','paypal','cash app','cashapp','apple pay','google pay',
+         'bank transfer','wire transfer','ach transfer','online transfer',
+         'loan payment','credit card payment','card payment','atm withdrawal','atm fee',
+         'check payment','payment to']
+  }
+};
+
+const CAT_NAMES = Object.keys(CATS);
+const UNCATEGORIZED = 'Uncategorized';
+
+// Pre-checks: specific patterns that must be evaluated BEFORE generic category sweeps
+// to avoid shorter keywords in earlier categories stealing the match.
+const PRE_CHECKS = [
+  // More specific patterns that would otherwise be caught by shorter keywords first
+  { kw: 'amazon web services', cat: 'Subscriptions' },
+  { kw: 'aws, inc',            cat: 'Subscriptions' },
+  { kw: 'aws.amazon',          cat: 'Subscriptions' },
+  { kw: 'apple.com/bill',      cat: 'Subscriptions' },
+  { kw: 'apl*apple',           cat: 'Subscriptions' },
+  { kw: 'apl*itunes',          cat: 'Subscriptions' },
+  { kw: 'google workspace',    cat: 'Subscriptions' },
+  { kw: 'cvs/pharmacy',        cat: 'Healthcare' },   // before 'macy' inside "pharmacy"
+  { kw: 'cvs pharmacy',        cat: 'Healthcare' },
+  { kw: 'pharmacy',            cat: 'Healthcare' },
+  { kw: 'uber eats',           cat: 'Food & Drink' },  // before generic 'uber' → Transport
+  { kw: 'ubereats',            cat: 'Food & Drink' },
+  { kw: 'tst*',                cat: 'Food & Drink' },  // Toast restaurant POS
+  { kw: 'tst ',                cat: 'Food & Drink' },
+  { kw: 'amzn mktp',           cat: 'Shopping' },      // Amazon Marketplace → Shopping
+  { kw: 'enterprise rent',     cat: 'Transport' },
+  { kw: 'budget rent',         cat: 'Transport' },
+];
+
+function categorize(desc) {
+  if (!desc) return UNCATEGORIZED;
+  const low = desc.toLowerCase();
+
+  // Pre-checks: longest/most-specific patterns first
+  for (const { kw, cat } of PRE_CHECKS) {
+    if (low.includes(kw)) return cat;
+  }
+
+  // Main sweep: categories in defined order
+  for (const cat of CAT_NAMES) {
+    for (const kw of CATS[cat].kw) {
+      if (low.includes(kw)) return cat;
+    }
+  }
+
+  // Word-boundary pass: short terms that would collide with common words
+  // e.g. 'rent' matches 'current', 'parent' without boundary check
+  const words = low.replace(/[^a-z0-9 ]/g, ' ').split(/\s+/);
+  if (words.includes('rent') || words.includes('landlord')) return 'Housing';
+
+  return UNCATEGORIZED;
+}
+function catColor(c) { return CATS[c] ? CATS[c].color : '#9ca3af'; }
+function catBg(c)    { return CATS[c] ? CATS[c].bg    : '#f3f4f6'; }
+
+// ─────────────────────────────────────────────
+// CSV PARSER
+// ─────────────────────────────────────────────
+
+// Detect the field delimiter used in a CSV string.
+// Counts commas, semicolons, and tabs in the first meaningful line
+// (outside of quoted regions) and returns the most frequent one.
+// Falls back to comma if there's a tie or no clear winner.
+function detectDelimiter(text) {
+  // Find the first non-empty line
+  const firstLine = text.split(/\r?\n/).find(l => l.trim().length > 0) || '';
+
+  // Count delimiters outside of quoted regions
+  let counts = { ',': 0, ';': 0, '\t': 0 };
+  let inQ = false;
+  for (const ch of firstLine) {
+    if      (ch === '"') inQ = !inQ;
+    else if (!inQ && ch in counts) counts[ch]++;
+  }
+
+  // Prefer the delimiter with the highest count; tie-break: comma > semicolon > tab
+  const max = Math.max(...Object.values(counts));
+  if (max === 0) return ',';
+  if (counts[','] === max) return ',';
+  if (counts[';'] === max) return ';';
+  return '\t';
+}
+
+function parseCSV(text) {
+  // Strip UTF-8 BOM
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  // Normalize line endings
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Auto-detect the field delimiter (comma, semicolon, or tab)
+  const DELIM = detectDelimiter(text);
+
+  const rows   = [];
+  let fields   = [];
+  let cur      = '';
+  let inQuotes = false;
+
+  const commitField = () => { fields.push(cur); cur = ''; };
+  const commitRow   = () => {
+    commitField();
+    // Only keep rows with at least one non-empty field
+    if (fields.some(f => f.trim() !== '')) rows.push([...fields]);
+    fields = [];
+  };
+
+  for (let i = 0; i <= text.length; i++) {
+    const ch = i < text.length ? text[i] : null;
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < text.length && text[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else if (ch === null) { inQuotes = false; commitRow(); }
+      else cur += ch;
+    } else {
+      if      (ch === '"')                   inQuotes = true;
+      else if (ch === DELIM)                 commitField();
+      else if (ch === '\n' || ch === null)   commitRow();
+      else                                   cur += ch;
+    }
+  }
+  return rows;
+}
+
+// ─────────────────────────────────────────────
+// COLUMN DETECTION
+// ─────────────────────────────────────────────
+function detectCols(hdrs) {
+  const norm = hdrs.map(h => h.toLowerCase().trim().replace(/[^a-z ]/g, ''));
+
+  let dateIdx = -1, amtIdx = -1, descIdx = -1, debitIdx = -1, creditIdx = -1;
+
+  // Ordered priority lists
+  const DATE_NAMES   = ['transaction date','trans date','date','posted date','post date',
+                         'posting date','value date','settlement date'];
+  const AMT_NAMES    = ['amount','transaction amount','net amount','value','sum'];
+  const DESC_NAMES   = ['description','memo','merchant name','payee','merchant',
+                         'transaction description','narration','details','name',
+                         'reference','particulars'];
+  const DEBIT_NAMES  = ['debit','debit amount','withdrawal','withdrawals','charge','charged'];
+  const CREDIT_NAMES = ['credit','credit amount','deposit','deposits','payment received'];
+
+  const firstMatch = (list, norms) => {
+    for (const n of list) {
+      const i = norms.indexOf(n);
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+
+  dateIdx   = firstMatch(DATE_NAMES,   norm);
+  amtIdx    = firstMatch(AMT_NAMES,    norm);
+  descIdx   = firstMatch(DESC_NAMES,   norm);
+  debitIdx  = firstMatch(DEBIT_NAMES,  norm);
+  creditIdx = firstMatch(CREDIT_NAMES, norm);
+
+  // Fuzzy fallbacks
+  if (dateIdx  < 0) norm.forEach((h, i) => { if (h.includes('date')   && dateIdx  < 0) dateIdx  = i; });
+  if (amtIdx   < 0) norm.forEach((h, i) => { if (h.includes('amount') && amtIdx   < 0) amtIdx   = i; });
+  if (descIdx  < 0) norm.forEach((h, i) => { if ((h.includes('desc') || h.includes('memo') || h.includes('payee')) && descIdx < 0) descIdx = i; });
+
+  // Detect bank brand
+  let bank = '';
+  if      (norm.includes('transaction date') && norm.includes('post date')) bank = 'Chase';
+  else if (norm.includes('posted date') && norm.includes('reference number')) bank = 'Bank of America';
+  else if (norm.includes('posted date') && norm.includes('payee')) bank = 'Bank of America';
+  else if (debitIdx >= 0 && creditIdx >= 0 && norm.includes('transaction date')) bank = 'Capital One';
+  else if (norm.includes('time') && norm.includes('type') && norm.includes('amount')) bank = 'Ally';
+  // Discover: 'Trans. Date' normalises to 'trans date'
+  else if (norm.includes('trans date') && norm.includes('post date')) bank = 'Discover';
+  // Citibank: Status + separate Debit/Credit columns (no combined Amount)
+  else if (norm.includes('status') && debitIdx >= 0 && creditIdx >= 0) bank = 'Citibank';
+  // American Express: has 'extended details' or 'appears on your statement as'
+  else if (norm.some(h => h.includes('extended details') || h.includes('appears on your statement'))) bank = 'American Express';
+  // TD Bank / generic: has 'balance' column alongside separate debit/credit
+  else if (norm.includes('balance') && debitIdx >= 0 && creditIdx >= 0) bank = 'TD Bank';
+  // USAA: 'Transaction Date', 'Payee', 'Category', 'Memo', 'Amount'
+  else if (norm.includes('transaction date') && norm.includes('memo') && norm.includes('payee')) bank = 'USAA';
+  // Wells Fargo exports often have empty/asterisk columns between amount and description
+  else if (norm.filter(h => h === '').length >= 1 && dateIdx >= 0 && amtIdx >= 0 && descIdx >= 0) bank = 'Wells Fargo';
+
+  // Confidence: 0–3 based on which key columns were found
+  let confidence = 0;
+  if (dateIdx >= 0) confidence++;
+  if (amtIdx >= 0 || (debitIdx >= 0 && creditIdx >= 0)) confidence++;
+  if (descIdx >= 0) confidence++;
+
+  return { dateIdx, amtIdx, descIdx, debitIdx, creditIdx, bank, confidence };
+}
+
+// ─────────────────────────────────────────────
+// AMOUNT + DATE PARSING
+// ─────────────────────────────────────────────
+function parseAmount(raw) {
+  if (raw === null || raw === undefined || String(raw).trim() === '') return NaN;
+  let s = String(raw).trim();
+
+  // Detect sign from leading −/- or parentheses (accounting notation)
+  const neg = (s.startsWith('(') && s.endsWith(')')) || s.startsWith('-') || s.startsWith('\u2212');
+
+  // Strip currency symbols, whitespace, parentheses, and sign chars
+  s = s.replace(/[$£€¥\s()]/g, '').replace(/^[+\-\u2212]/, '');
+
+  // Detect number format (US vs European) by which separator comes last:
+  //   US:  1,234.56  → comma = thousands, dot = decimal
+  //   EU:  1.234,56  → dot = thousands, comma = decimal
+  //   EU:  6,75      → comma = decimal (no thousands sep)
+  const hasDot   = s.includes('.');
+  const hasComma = s.includes(',');
+
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      // European format: 1.234,56 → 1234.56
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US format: 1,234.56 → 1234.56
+      s = s.replace(/,/g, '');
+    }
+  } else if (hasComma && !hasDot) {
+    // Comma only: EU decimal if followed by 1–2 digits at end, else US thousands
+    if (/,\d{1,2}$/.test(s)) {
+      s = s.replace(',', '.');   // EU: 6,75 → 6.75
+    } else {
+      s = s.replace(/,/g, '');   // US thousands: 1,234 → 1234
+    }
+  }
+  // else: dot only, or no separator → already standard format
+
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : (neg ? -n : n);
+}
+
+function parseDate(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+
+  // ISO: 2024-01-31 or 2024-01-31T... — verify fields because
+  // JavaScript otherwise normalizes invalid calendar dates (for example Feb 31).
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|\s|$)/);
+  if (iso) {
+    const year = parseInt(iso[1], 10);
+    const month = parseInt(iso[2], 10);
+    const day = parseInt(iso[3], 10);
+    const d = new Date(year, month - 1, day);
+    if (isNaN(d.getTime()) || d.getFullYear() !== year ||
+        d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+    return d;
+  }
+
+  // Slash/dash separated: MM/DD/YYYY, DD/MM/YYYY, MM-DD-YYYY, etc.
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (m) {
+    let yr    = parseInt(m[3], 10);
+    if (yr < 100) yr += yr < 50 ? 2000 : 1900;
+    let part1 = parseInt(m[1], 10);
+    let part2 = parseInt(m[2], 10);
+
+    // Auto-detect DD/MM/YYYY: if the first component is > 12 it must be the day,
+    // and if the second component is a valid month (1–12) swap them.
+    if (part1 > 12 && part2 >= 1 && part2 <= 12) {
+      [part1, part2] = [part2, part1];  // now part1 = month, part2 = day
+    }
+
+    const d = new Date(yr, part1 - 1, part2);
+    // Reject silently-wrapped dates (e.g. Feb 31 becomes Mar 3 in JS)
+    if (isNaN(d.getTime()) || d.getMonth() !== part1 - 1) return null;
+    return d;
+  }
+
+  // ISO-style month name: 'Jan 15, 2024' or '15 Jan 2024' etc.
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Quote a field for spreadsheet-safe CSV export. The leading tab prevents
+// formula execution in common spreadsheet apps while preserving the visible text.
+function csvCell(value, protectFormulas = true) {
+  let s = String(value ?? '');
+  if (protectFormulas && /^[=+\-@\t\r\n＝＋－＠]/.test(s)) s = '\t' + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
+// ─────────────────────────────────────────────
+// BUILD TRANSACTIONS
+// ─────────────────────────────────────────────
+function buildTransactions(dataRows, cols) {
+  const { dateIdx, amtIdx, descIdx, debitIdx, creditIdx } = cols;
+  const txs = [];
+
+  for (const row of dataRows) {
+    let amount;
+    if (debitIdx >= 0 && creditIdx >= 0 && amtIdx < 0) {
+      // Capital One style: Credit - Debit
+      const d = parseAmount(row[debitIdx]);
+      const c = parseAmount(row[creditIdx]);
+      amount = (isNaN(c) ? 0 : c) - (isNaN(d) ? 0 : d);
+    } else {
+      amount = parseAmount(row[amtIdx]);
+    }
+
+    if (isNaN(amount)) continue;
+
+    const date = parseDate(dateIdx >= 0 ? row[dateIdx] : null);
+    if (!date) continue;
+
+    const desc = descIdx >= 0 ? String(row[descIdx] || '').trim() : '';
+    const cat  = categorize(desc);
+
+    txs.push({ date, desc, amount, cat });
+  }
+
+  // Most recent first
+  txs.sort((a, b) => b.date - a.date);
+  return txs;
+}
+
+// Some bank exports include account-summary rows before the actual column headers.
+// Scan the first several rows to find the one most likely to be the true header.
+function findHeaderRowIdx(rows) {
+  for (let i = 0; i < Math.min(8, rows.length - 1); i++) {
+    const row = rows[i];
+    // A real header row has multiple non-empty fields
+    if (!row || row.filter(c => c.trim()).length < 2) continue;
+    const cols = detectCols(row);
+    if (cols.confidence >= 2) return i;
+  }
+  return 0; // default: assume first row is the header
+}
+/* STATEMENTLENS_CORE_END */
+
+// ─────────────────────────────────────────────
+// FILE HANDLING
+// ─────────────────────────────────────────────
+function initDropZone() {
+  const zone  = document.getElementById('drop-zone');
+  const input = document.getElementById('file-input');
+
+  zone.addEventListener('click', e => {
+    // Don't trigger file picker when clicking interactive children
+    // (label already handles its own input click; buttons/summary handle their own actions)
+    if (e.target.closest('label, button, a, summary, details')) return;
+    input.click();
+  });
+  zone.addEventListener('keydown', e => {
+    // Only respond when the zone DIV itself has focus, not a child element
+    if (e.target !== zone) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  input.addEventListener('change', e => {
+    if (e.target.files[0]) loadFile(e.target.files[0]);
+  });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+}
+
+function loadFile(file) {
+  const name = file.name.toLowerCase();
+  if (!name.endsWith('.csv') && file.type !== 'text/csv' && file.type !== 'application/csv') {
+    showError('Please choose a CSV file',
+      'Only .csv files are supported. Your bank should have a "Download as CSV" or "Export transactions" option.');
+    return;
+  }
+
+  const MAX_FILE_BYTES = 20 * 1024 * 1024;
+  if (file.size > MAX_FILE_BYTES) {
+    showError('CSV is too large',
+      'StatementLens accepts files up to 20 MB. Export a shorter date range from your bank and try again.');
+    return;
+  }
+
+  showSection('loading');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      rawRows = parseCSV(e.target.result);
+
+      if (rawRows.length < 2) {
+        showError('File appears empty',
+          'The CSV has fewer than 2 rows. Make sure you\'re exporting transaction history, not an account summary.');
+        return;
+      }
+
+      // Find the actual header row (skips account-summary rows some banks prepend)
+      headerRowIdx  = findHeaderRowIdx(rawRows);
+      headers       = rawRows[headerRowIdx].map(h => String(h).trim());
+      headerSkipNote = headerRowIdx > 0
+        ? `(skipped ${headerRowIdx} metadata row${headerRowIdx > 1 ? 's' : ''})`
+        : '';
+      const dataRows = rawRows.slice(headerRowIdx + 1);
+      const cols     = detectCols(headers);
+
+      if (cols.confidence >= 2) {
+        const txs = buildTransactions(dataRows, cols);
+        if (txs.length === 0) {
+          showMapper(headers, cols);
+          return;
+        }
+        transactions = txs;
+        detectedBank = cols.bank || '';
+        showResults();
+      } else {
+        showMapper(headers, cols);
+      }
+    } catch (err) {
+      showError('Could not parse file', 'Error: ' + (err.message || 'unexpected error') + '. Try re-downloading the file from your bank.');
+    }
+  };
+  reader.onerror = () => showError('Could not read file', 'The browser could not read the file. Try again or re-download from your bank.');
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ─────────────────────────────────────────────
+// COLUMN MAPPER
+// ─────────────────────────────────────────────
+function showMapper(hdrs, prefill) {
+  showSection('map');
+
+  // Show header + first 3 data rows as preview (use the correct header row)
+  const previewRows = rawRows.slice(headerRowIdx, headerRowIdx + 4);
+  const preview = previewRows.map(r => r.join(' | ')).join('\n');
+  document.getElementById('map-preview').textContent = preview;
+
+  // Collect sample values from actual data rows (below the header)
+  const sampleRows = rawRows.slice(headerRowIdx + 1, headerRowIdx + 4);
+
+  function fillSelect(id, optional) {
+    const sel = document.getElementById(id);
+    sel.innerHTML = optional ? '<option value="">— Not applicable —</option>' : '';
+    hdrs.forEach((h, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      const samples = sampleRows
+        .map(r => (r[i] || '').trim().slice(0, 18))
+        .filter(s => s !== '')
+        .slice(0, 2)
+        .join(', ');
+      opt.textContent = (h || '(col ' + (i + 1) + ')') + (samples ? '  —  e.g. ' + samples : '');
+      sel.appendChild(opt);
+    });
+  }
+
+  fillSelect('col-date',   false);
+  fillSelect('col-amount', true);
+  fillSelect('col-debit',  true);
+  fillSelect('col-credit', true);
+  fillSelect('col-desc',   false);
+
+  if (prefill) {
+    if (prefill.dateIdx  >= 0) document.getElementById('col-date').value   = prefill.dateIdx;
+    if (prefill.amtIdx   >= 0) document.getElementById('col-amount').value = prefill.amtIdx;
+    if (prefill.debitIdx >= 0) document.getElementById('col-debit').value  = prefill.debitIdx;
+    if (prefill.creditIdx>= 0) document.getElementById('col-credit').value = prefill.creditIdx;
+    if (prefill.descIdx  >= 0) document.getElementById('col-desc').value   = prefill.descIdx;
+  }
+}
+
+function applyColumnMapping() {
+  const dateIdx   = parseInt(document.getElementById('col-date').value,   10);
+  const amtVal    = document.getElementById('col-amount').value;
+  const debitVal  = document.getElementById('col-debit').value;
+  const creditVal = document.getElementById('col-credit').value;
+  const descIdx   = parseInt(document.getElementById('col-desc').value,   10);
+
+  const amtIdx    = amtVal    !== '' ? parseInt(amtVal,    10) : -1;
+  const debitIdx  = debitVal  !== '' ? parseInt(debitVal,  10) : -1;
+  const creditIdx = creditVal !== '' ? parseInt(creditVal, 10) : -1;
+
+  if (isNaN(dateIdx)) {
+    alert('Please select a Date column.'); return;
+  }
+  if (amtIdx < 0 && debitIdx < 0) {
+    alert('Please select either an Amount column or a Debit column.'); return;
+  }
+  if (isNaN(descIdx)) {
+    alert('Please select a Description column.'); return;
+  }
+
+  // Use headerRowIdx so metadata preamble rows are correctly excluded
+  const txs = buildTransactions(rawRows.slice(headerRowIdx + 1), { dateIdx, amtIdx, descIdx, debitIdx, creditIdx });
+  if (txs.length === 0) {
+    showError('No transactions found',
+      'With the selected columns, no valid rows could be parsed. Please check that the date and amount columns contain numbers and dates.');
+    return;
+  }
+
+  transactions = txs;
+  detectedBank = 'Custom';
+  showResults();
+}
+
+// ─────────────────────────────────────────────
+// RESULTS
+// ─────────────────────────────────────────────
+function showResults() {
+  showSection('results');
+  document.getElementById('reset-btn').style.display = '';
+
+  // Show/hide sample data banner
+  const banner = document.getElementById('sample-banner');
+  if (banner) banner.hidden = !isSampleData;
+
+  const notice = document.getElementById('bank-notice');
+  if (isSampleData) {
+    notice.textContent = '6 months of fictional sample data — ' + transactions.length + ' transactions';
+  } else {
+    // Build the notice from separate bank name and skip-note parts
+    const parts = [];
+    if (detectedBank) parts.push('Detected: ' + detectedBank + ' format');
+    if (headerSkipNote) parts.push(headerSkipNote);
+    const prefix = parts.length ? '✓ ' + parts.join(' ') + ' — ' : '✓ ';
+    notice.textContent = prefix + transactions.length + ' transactions loaded';
+  }
+
+  const signConvention = document.getElementById('sign-convention');
+  if (signConvention) signConvention.hidden = isSampleData;
+  updateFlipSignsLabel();
+
+  renderSummary();
+  renderMonthlyChart();
+  renderCatChart();
+  sortCol = 'date'; sortDir = -1;
+  catFilter = null; monthFilter = null; searchTerm = '';
+  document.getElementById('search-input').value = '';
+  renderTable();
+  // Scroll to top and move focus to results heading (accessibility)
+  setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const h = document.getElementById('results-heading');
+    if (h) h.focus();
+  }, 100);
+}
+
+// ─────────────────────────────────────────────
+// SUMMARY CARDS
+// ─────────────────────────────────────────────
+function renderSummary() {
+  let income = 0, expenses = 0, minD = null, maxD = null;
+  let expenseTxCount = 0, catCount = 0;
+  for (const tx of transactions) {
+    if (tx.amount > 0) income   += tx.amount;
+    else {
+      expenses += Math.abs(tx.amount);
+      expenseTxCount++;
+      if (tx.cat !== UNCATEGORIZED) catCount++;
+    }
+    if (!minD || tx.date < minD) minD = tx.date;
+    if (!maxD || tx.date > maxD) maxD = tx.date;
+  }
+  const net    = income - expenses;
+  const catPct = expenseTxCount > 0 ? Math.round(catCount / expenseTxCount * 100) : 0;
+  const fd     = d => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  const grid = document.getElementById('summary-grid');
+  grid.innerHTML = '';
+
+  const cards = [
+    { label: 'Total Income',    value: fmtMoney(income),   cls: 'income',
+      sub: 'deposits & credits' },
+    { label: 'Total Expenses',  value: fmtMoney(expenses), cls: 'expense',
+      sub: 'debits & withdrawals' },
+    { label: net >= 0 ? 'Surplus' : 'Deficit',
+      value: (net >= 0 ? '+' : '−') + fmtMoney(Math.abs(net)),
+      cls: net >= 0 ? 'net-pos' : 'net-neg',
+      sub: 'income minus expenses' },
+    { label: 'Date Range',      value: fd(minD), cls: '',
+      sub: 'to ' + fd(maxD) },
+    { label: 'Auto-Categorized', value: catPct + '%',
+      cls: catPct >= 70 ? 'net-pos' : catPct >= 40 ? '' : 'net-neg',
+      sub: catCount + ' of ' + expenseTxCount + ' expense rows',
+      clickable: expenseTxCount > catCount  // there are uncategorized expenses to review
+    },
+  ];
+
+  for (const c of cards) {
+    const el = document.createElement('div');
+    el.className = 's-card';
+    if (c.clickable) {
+      el.style.cssText += 'cursor:pointer;border-color:#e5e7eb;transition:box-shadow 0.15s;';
+      el.title = 'Click to review uncategorized transactions';
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      el.addEventListener('click', () => {
+        setCatFilter(UNCATEGORIZED);
+        document.querySelector('.table-header').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setCatFilter(UNCATEGORIZED);
+          document.querySelector('.table-header').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+      el.addEventListener('mouseenter', () => el.style.boxShadow = '0 0 0 2px var(--accent)');
+      el.addEventListener('mouseleave', () => el.style.boxShadow = '');
+    }
+    const lbl = document.createElement('div'); lbl.className = 's-label';   lbl.textContent = c.label;
+    const val = document.createElement('div'); val.className = 's-value ' + c.cls; val.textContent = c.value;
+    const sub = document.createElement('div'); sub.className = 's-sub';
+    sub.textContent = c.sub + (c.clickable ? ' — click to review' : '');
+    el.append(lbl, val, sub);
+    grid.appendChild(el);
+  }
+}
+
+// ─────────────────────────────────────────────
+// MONTHLY CHART (SVG)
+// ─────────────────────────────────────────────
+function renderMonthlyChart() {
+  const byMonth = {};
+  for (const tx of transactions) {
+    const k = tx.date.getFullYear() + '-' + String(tx.date.getMonth() + 1).padStart(2, '0');
+    if (!byMonth[k]) byMonth[k] = { inc: 0, exp: 0 };
+    if (tx.amount > 0) byMonth[k].inc += tx.amount;
+    else               byMonth[k].exp += Math.abs(tx.amount);
+  }
+
+  const keys    = Object.keys(byMonth).sort().slice(-24);
+  const maxVal  = Math.max(...keys.map(k => Math.max(byMonth[k].inc, byMonth[k].exp)), 1);
+  const n       = keys.length;
+
+  // Use larger coordinate space so font sizes stay readable when SVG scales down on mobile
+  const W = 520, H = 185, PL = 56, PB = 32, PT = 24, PR = 8;
+  const cW = W - PL - PR;
+  const cH = H - PB - PT;
+  const gW = cW / (n || 1);
+  const bW = Math.min(Math.max(gW * 0.32, 4), 22);
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Monthly cash flow bar chart"
+       aria-describedby="monthly-chart-desc">`;
+  svg += `<desc id="monthly-chart-desc">Bar chart showing income and expenses by month.</desc>`;
+
+  // Y gridlines
+  for (let g = 0; g <= 4; g++) {
+    const y = PT + cH - cH * g / 4;
+    svg += `<line x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`;
+    svg += `<text x="${PL - 6}" y="${y + 4}" text-anchor="end" font-size="12" fill="#9ca3af">${fmtK(maxVal * g / 4)}</text>`;
+  }
+
+  // Bars — each month wrapped in a clickable <g> group
+  const step = n <= 12 ? 1 : n <= 18 ? 2 : 3;
+  for (let i = 0; i < n; i++) {
+    const k   = keys[i];
+    const d   = byMonth[k];
+    const cx  = PL + i * gW + gW / 2;
+    const lbl = fmtMonthLabel(k);
+    // Dim non-selected months when a month filter is active
+    const grpOpacity = (!monthFilter || monthFilter === k) ? 1 : 0.28;
+    const isSelected = monthFilter === k;
+
+    svg += `<g class="month-bar-group" data-month="${k}"
+             onclick="setMonthFilter('${k}')"
+             onkeydown="if(event.key==='Enter'||event.key===' ')setMonthFilter('${k}')"
+             tabindex="0" role="button"
+             aria-label="${isSelected ? 'Clear filter for ' + lbl : 'Filter to ' + lbl}"
+             style="cursor:pointer;outline:none;opacity:${grpOpacity}"
+             aria-pressed="${isSelected}">`;
+
+    // Invisible hit-target (easier to click the group)
+    svg += `<rect x="${cx - gW / 2 + 2}" y="${PT}" width="${gW - 4}" height="${cH + 8}"
+              fill="transparent" rx="2"/>`;
+
+    // Income bar
+    const ih = Math.max((d.inc / maxVal) * cH, d.inc > 0 ? 1 : 0);
+    if (ih > 0) {
+      svg += `<rect x="${cx - bW - 1}" y="${PT + cH - ih}" width="${bW}" height="${ih}"
+                fill="#16a34a" rx="2">
+                <title>Income ${lbl}: ${fmtMoney(d.inc)}</title></rect>`;
+    }
+
+    // Expense bar
+    const eh = Math.max((d.exp / maxVal) * cH, d.exp > 0 ? 1 : 0);
+    if (eh > 0) {
+      svg += `<rect x="${cx + 1}" y="${PT + cH - eh}" width="${bW}" height="${eh}"
+                fill="#ef4444" rx="2">
+                <title>Expenses ${lbl}: ${fmtMoney(d.exp)}</title></rect>`;
+    }
+
+    // Selection ring under bars
+    if (isSelected) {
+      svg += `<rect x="${cx - gW / 2 + 3}" y="${PT + cH + 1}" width="${gW - 6}" height="3"
+                fill="#2563eb" rx="1"/>`;  // blue underline for selected month
+    }
+
+    // X axis label
+    if (i % step === 0) {
+      svg += `<text x="${cx}" y="${H - 5}" text-anchor="middle"
+                font-size="11" fill="${isSelected ? '#2563eb' : '#6b7280'}"
+                font-weight="${isSelected ? 'bold' : 'normal'}">${lbl}</text>`;
+    }
+
+    svg += `</g>`;
+  }
+
+  // Legend
+  svg += `<rect x="${PL}" y="7" width="11" height="11" fill="#16a34a" rx="2"/>
+          <text x="${PL + 15}" y="17" font-size="13" fill="#374151">Income</text>
+          <rect x="${PL + 72}" y="7" width="11" height="11" fill="#ef4444" rx="2"/>
+          <text x="${PL + 87}" y="17" font-size="13" fill="#374151">Expenses</text>`;
+
+  svg += '</svg>';
+  document.getElementById('monthly-chart').innerHTML = svg;
+}
+
+// ─────────────────────────────────────────────
+// CATEGORY CHART
+// ─────────────────────────────────────────────
+function renderCatChart() {
+  const totals = {};
+  for (const tx of transactions) {
+    // Respect the month filter so chart matches the filtered table
+    if (monthFilter) {
+      const txKey = tx.date.getFullYear() + '-' + String(tx.date.getMonth() + 1).padStart(2, '0');
+      if (txKey !== monthFilter) continue;
+    }
+    if (tx.amount < 0) totals[tx.cat] = (totals[tx.cat] || 0) + Math.abs(tx.amount);
+  }
+
+  // Update chart title to indicate month context
+  const titleEl = document.getElementById('cat-chart-title');
+  if (titleEl) {
+    titleEl.textContent = monthFilter
+      ? 'Spending by Category — ' + fmtMonthLabel(monthFilter)
+      : 'Spending by Category';
+  }
+
+  const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const maxAmt = sorted[0] ? sorted[0][1] : 1;
+  const el     = document.getElementById('cat-chart');
+  el.innerHTML = '';
+
+  if (!sorted.length) {
+    el.textContent = 'No expense transactions found.';
+    return;
+  }
+
+  for (const [cat, total] of sorted) {
+    const pct = (total / maxAmt) * 100;
+
+    const row   = document.createElement('div'); row.className = 'cat-row';
+    const name  = document.createElement('span'); name.className = 'cat-name'; name.textContent = cat; name.title = cat;
+    const wrap  = document.createElement('div'); wrap.className = 'cat-bar-wrap';
+    wrap.title = 'Click to filter: ' + cat;
+    wrap.setAttribute('role', 'button');
+    wrap.setAttribute('tabindex', '0');
+    wrap.addEventListener('click', () => setCatFilter(cat));
+    wrap.addEventListener('keydown', e => { if (e.key === 'Enter') setCatFilter(cat); });
+    const fill  = document.createElement('div'); fill.className = 'cat-bar-fill';
+    fill.style.cssText = `width:${pct}%; background:${catColor(cat)};`;
+    const amt   = document.createElement('span'); amt.className = 'cat-amount'; amt.textContent = fmtMoney(total);
+
+    wrap.appendChild(fill);
+    row.append(name, wrap, amt);
+    el.appendChild(row);
+  }
+}
+
+// ─────────────────────────────────────────────
+// TRANSACTION TABLE
+// ─────────────────────────────────────────────
+function renderTable() {
+  const search = searchTerm.toLowerCase();
+
+  const filtered = transactions.filter(tx => {
+    if (catFilter && tx.cat !== catFilter) return false;
+    if (monthFilter) {
+      const txKey = tx.date.getFullYear() + '-' + String(tx.date.getMonth() + 1).padStart(2, '0');
+      if (txKey !== monthFilter) return false;
+    }
+    if (search && !tx.desc.toLowerCase().includes(search) &&
+        !tx.cat.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    let va, vb;
+    if      (sortCol === 'date')   { va = a.date;            vb = b.date; }
+    else if (sortCol === 'amount') { va = a.amount;          vb = b.amount; }
+    else if (sortCol === 'desc')   { va = a.desc.toLowerCase(); vb = b.desc.toLowerCase(); }
+    else if (sortCol === 'cat')    { va = a.cat;             vb = b.cat; }
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+
+  // Count
+  document.getElementById('tx-count').textContent =
+    filtered.length + ' of ' + transactions.length + ' transactions';
+
+  // Update export button labels to reflect the filtered count
+  const isFiltered = filtered.length < transactions.length;
+  const csvBtn  = document.querySelector('.export-bar button:nth-child(2)');
+  const textBtn = document.querySelector('.export-bar button:nth-child(1)');
+  if (csvBtn)  csvBtn.textContent  = isFiltered ? `⬇ Download CSV (${filtered.length} rows)` : '⬇ Download categorized CSV';
+  if (textBtn) textBtn.textContent = isFiltered ? '📋 Copy summary (filtered)' : '📋 Copy summary text';
+
+  // Category filter badge
+  const badge = document.getElementById('filter-badge');
+  if (catFilter) { badge.style.display = ''; badge.textContent = catFilter + ' ✕'; }
+  else           { badge.style.display = 'none'; }
+
+  // Month filter badge
+  const mbadge = document.getElementById('month-badge');
+  if (mbadge) {
+    if (monthFilter) { mbadge.style.display = ''; mbadge.textContent = fmtMonthLabel(monthFilter) + ' ✕'; }
+    else             { mbadge.style.display = 'none'; }
+  }
+
+  // Sort header classes
+  ['date','desc','cat','amount'].forEach(col => {
+    const th = document.getElementById('th-' + col);
+    if (!th) return;
+    const cls = sortCol === col ? (sortDir > 0 ? 'sort-asc' : 'sort-desc') : 'sort-none';
+    th.className = cls;
+    th.setAttribute('aria-sort', sortCol === col ? (sortDir > 0 ? 'ascending' : 'descending') : 'none');
+  });
+
+  // Build a single table row element for a transaction.
+  // Used by both renderTable() (interactive) and printReport() (full-row print).
+  function buildTxRow(tx, interactive) {
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.className = 'td-date';
+    tdDate.textContent = tx.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const tdDesc = document.createElement('td');
+    tdDesc.className = 'td-desc';
+    tdDesc.textContent = tx.desc;
+    tdDesc.title = tx.desc;
+
+    const tdCat = document.createElement('td');
+    const pill  = document.createElement('span');
+    pill.className = 'cat-pill';
+    pill.style.cssText = `background:${catBg(tx.cat)};color:${catColor(tx.cat)};`;
+    pill.textContent = tx.cat;
+    if (interactive !== false) {
+      pill.title = 'Filter by ' + tx.cat;
+      pill.setAttribute('role', 'button');
+      pill.setAttribute('tabindex', '0');
+      pill.addEventListener('click',    () => setCatFilter(tx.cat));
+      pill.addEventListener('keydown',  e  => { if (e.key === 'Enter') setCatFilter(tx.cat); });
+    }
+    tdCat.appendChild(pill);
+
+    const tdAmt = document.createElement('td');
+    tdAmt.className = 'td-amt ' + (tx.amount >= 0 ? 'pos' : 'neg');
+    tdAmt.textContent = (tx.amount >= 0 ? '+' : '−') + fmtMoney(Math.abs(tx.amount));
+
+    tr.append(tdDate, tdDesc, tdCat, tdAmt);
+    return tr;
+  }
+
+  // Render rows — cap at LIMIT for interactive performance
+  const LIMIT  = 300;
+  const tbody  = document.getElementById('tx-tbody');
+  tbody.innerHTML = '';
+
+  filtered.slice(0, LIMIT).forEach(tx => tbody.appendChild(buildTxRow(tx, true)));
+
+  if (filtered.length > LIMIT) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.style.cssText = 'text-align:center;padding:12px;color:var(--muted);font-size:13px;';
+    const activeFilters = [catFilter && 'category', monthFilter && 'month', searchTerm && 'search'].filter(Boolean);
+    const filterHint = activeFilters.length ? `Filters active: ${activeFilters.join(', ')}. ` : '';
+    td.textContent = `Showing ${LIMIT} of ${filtered.length} matching rows. ${filterHint}Add more filters to narrow down.`;
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = (col === 'date' || col === 'amount') ? -1 : 1; }
+  renderTable();
+}
+
+function filterTable() {
+  searchTerm = document.getElementById('search-input').value;
+  renderTable();
+}
+
+function setCatFilter(cat) {
+  catFilter = cat;
+  renderTable();
+  document.querySelector('.table-header').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function clearCatFilter() {
+  catFilter = null;
+  renderTable();
+}
+
+function setMonthFilter(month) {
+  // Toggle: clicking the same month again clears the filter
+  monthFilter = (monthFilter === month) ? null : month;
+  renderMonthlyChart();  // re-render to update dimming / selection ring
+  renderCatChart();      // category chart must reflect the selected month
+  renderTable();
+  if (monthFilter) {
+    document.querySelector('.table-header').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function clearMonthFilter() {
+  monthFilter = null;
+  renderMonthlyChart();
+  renderCatChart();      // restore full-period category totals
+  renderTable();
+}
+
+// ─────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────
+
+// Returns the set of transactions that pass all active filters.
+// Used by exports so they match what the user sees.
+function getFilteredTransactions() {
+  const search = searchTerm.toLowerCase();
+  return transactions.filter(tx => {
+    if (catFilter && tx.cat !== catFilter) return false;
+    if (monthFilter) {
+      const k = tx.date.getFullYear() + '-' + String(tx.date.getMonth() + 1).padStart(2, '0');
+      if (k !== monthFilter) return false;
+    }
+    if (search && !tx.desc.toLowerCase().includes(search) &&
+        !tx.cat.toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+
+// Returns filtered transactions in the same sort order currently shown in the table.
+function getSortedFilteredTransactions() {
+  const arr = getFilteredTransactions().slice(); // copy
+  arr.sort((a, b) => {
+    let va, vb;
+    if      (sortCol === 'date')   { va = a.date;               vb = b.date; }
+    else if (sortCol === 'amount') { va = a.amount;             vb = b.amount; }
+    else if (sortCol === 'desc')   { va = a.desc.toLowerCase(); vb = b.desc.toLowerCase(); }
+    else if (sortCol === 'cat')    { va = a.cat;                vb = b.cat; }
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+  return arr;
+}
+
+// Format a Date as YYYY-MM-DD (ISO 8601) — safe for Excel, Google Sheets, and scripts.
+function fmtDateISO(d) {
+  if (!d) return '';
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+// Describe active filters in a short human-readable string.
+function filterDescription() {
+  const parts = [];
+  if (monthFilter) parts.push(fmtMonthLabel(monthFilter));
+  if (catFilter)   parts.push(catFilter);
+  if (searchTerm)  parts.push('search: "' + searchTerm + '"');
+  return parts.length ? parts.join(', ') : null;
+}
+
+function copySummary() {
+  const visible = getFilteredTransactions();
+  const filterDesc = filterDescription();
+  const isFiltered = visible.length < transactions.length;
+
+  let income = 0, expenses = 0;
+  const cats = {};
+  for (const tx of visible) {
+    if (tx.amount > 0) income += tx.amount;
+    else {
+      expenses += Math.abs(tx.amount);
+      cats[tx.cat] = (cats[tx.cat] || 0) + Math.abs(tx.amount);
+    }
+  }
+  const net     = income - expenses;
+  const topCats = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const dates   = visible.map(t => t.date).sort((a, b) => a - b);
+  const from    = dates[0] ? dates[0].toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '?';
+  const to      = dates[dates.length-1] ? dates[dates.length-1].toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : '?';
+
+  let text = `StatementLens Summary\n`;
+  text    += `${'─'.repeat(30)}\n`;
+  if (isFiltered) {
+    text  += `Filter:       ${filterDesc}\n`;
+    text  += `Showing:      ${visible.length} of ${transactions.length} transactions\n`;
+  } else {
+    text  += `Transactions: ${transactions.length}\n`;
+  }
+  text    += `Period:       ${from} – ${to}\n`;
+  text    += `Income:       ${fmtMoney(income)}\n`;
+  text    += `Expenses:     ${fmtMoney(expenses)}\n`;
+  text    += `Net:          ${net >= 0 ? '+' : '−'}${fmtMoney(Math.abs(net))}\n\n`;
+  text    += `Top Spending Categories:\n`;
+  topCats.forEach(([c, v]) => { text += `  ${c.padEnd(20)} ${fmtMoney(v)}\n`; });
+  text    += `\nAnalyzed privately — no data was uploaded to any server.\n`;
+  text    += `Tool: StatementLens (open source)\n`;
+
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('Summary copied' + (isFiltered ? ' (filtered view)' : '')))
+    .catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Summary copied' + (isFiltered ? ' (filtered view)' : ''));
+    });
+}
+
+function printReport() {
+  const visible    = getFilteredTransactions();
+  const filterDesc = filterDescription();
+
+  // Set print header text
+  const pd = document.getElementById('print-date');
+  if (pd) {
+    const dates = visible.map(t => t.date).sort((a, b) => a - b);
+    const from  = dates[0]   ? dates[0].toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '?';
+    const to    = dates[dates.length - 1] ? dates[dates.length-1].toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '?';
+    let line = 'Period: ' + from + ' – ' + to + ' · ' + visible.length + ' transaction' + (visible.length !== 1 ? 's' : '');
+    if (filterDesc) line += ' · Filter: ' + filterDesc;
+    line += ' · Printed ' + new Date().toLocaleDateString();
+    pd.textContent = line;
+  }
+
+  // Temporarily expand the table to show ALL filtered rows (not just the 300 in the DOM)
+  const tbody      = document.getElementById('tx-tbody');
+  const savedHTML  = tbody.innerHTML;   // save the current interactive rendering
+  const needsExpand = visible.length > 300;
+
+  if (needsExpand) {
+    tbody.innerHTML = '';
+    visible.forEach(tx => {
+      // Use non-interactive rows for print (no click handlers needed on paper)
+      const tr = document.createElement('tr');
+      const tdDate = document.createElement('td'); tdDate.className = 'td-date';
+      tdDate.textContent = tx.date.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+      const tdDesc = document.createElement('td'); tdDesc.className = 'td-desc';
+      tdDesc.textContent = tx.desc; tdDesc.title = tx.desc;
+      const tdCat  = document.createElement('td');
+      const pill   = document.createElement('span'); pill.className = 'cat-pill';
+      pill.style.cssText = `background:${catBg(tx.cat)};color:${catColor(tx.cat)};`;
+      pill.textContent = tx.cat; tdCat.appendChild(pill);
+      const tdAmt  = document.createElement('td');
+      tdAmt.className = 'td-amt ' + (tx.amount >= 0 ? 'pos' : 'neg');
+      tdAmt.textContent = (tx.amount >= 0 ? '+' : '−') + fmtMoney(Math.abs(tx.amount));
+      tr.append(tdDate, tdDesc, tdCat, tdAmt);
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Restore interactive table after the print dialog closes
+  const restore = () => {
+    if (needsExpand) tbody.innerHTML = savedHTML;
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+
+  window.print();
+}
+
+function exportCSV() {
+  // Use sorted order to match what the user sees in the table
+  const visible    = getSortedFilteredTransactions();
+  const filterDesc = filterDescription();
+  const isFiltered = visible.length < transactions.length;
+
+  const rows = [['Date', 'Description', 'Amount', 'Category'].map(v => csvCell(v, false))];
+  for (const tx of visible) {
+    rows.push([
+      csvCell(fmtDateISO(tx.date), false), // ISO 8601: 2026-01-03 — universally readable in spreadsheets
+      csvCell(tx.desc),
+      csvCell(tx.amount.toFixed(2), false),
+      csvCell(tx.cat, false)
+    ]);
+  }
+  const csv  = rows.map(r => r.join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  // Use a descriptive filename when filters are active
+  const slug = filterDesc ? '-' + filterDesc.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+  a.href = url; a.download = 'statement' + slug + '-categorized.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('CSV downloaded' + (isFiltered ? ' (' + visible.length + ' rows)' : ''));
+}
+
+function updateFlipSignsLabel() {
+  const btn = document.getElementById('flip-signs-btn');
+  if (btn) btn.textContent = signsFlipped ? 'Restore original signs' : 'Flip every amount';
+}
+
+function flipAllSigns() {
+  transactions.forEach(tx => { tx.amount = -tx.amount; });
+  signsFlipped = !signsFlipped;
+  updateFlipSignsLabel();
+  renderSummary();
+  renderMonthlyChart();
+  renderCatChart();
+  renderTable();
+  showToast(signsFlipped ? 'Amount signs flipped' : 'Original amount signs restored');
+}
+
+// ─────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────
+const SECTIONS = ['drop','loading','map','error','results'];
+
+function showSection(name) {
+  SECTIONS.forEach(s => {
+    const el = document.getElementById(s + '-section');
+    if (el) el.hidden = true;
+  });
+  const target = document.getElementById(name + '-section');
+  if (target) target.hidden = false;
+}
+
+function showError(title, msg) {
+  showSection('error');
+  document.getElementById('error-title').textContent = title;
+  document.getElementById('error-msg').textContent   = msg;
+}
+
+function resetApp() {
+  transactions = []; rawRows = []; headers = [];
+  catFilter = null; monthFilter = null; searchTerm = '';
+  detectedBank = ''; headerRowIdx = 0; headerSkipNote = '';
+  isSampleData = false;
+  signsFlipped = false;
+  sortCol = 'date'; sortDir = -1;
+  document.getElementById('reset-btn').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  const si = document.getElementById('search-input');
+  if (si) si.value = '';
+  const banner = document.getElementById('sample-banner');
+  if (banner) banner.hidden = true;
+  showSection('drop');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = 'none'; }, 2600);
+}
+
+function fmtMoney(n) {
+  const abs = Math.abs(n);
+  return '$' + abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtK(n) {
+  if (n >= 10000) return '$' + Math.round(n / 1000) + 'k';
+  if (n >= 1000)  return '$' + (n / 1000).toFixed(1) + 'k';
+  return '$' + Math.round(n);
+}
+function fmtMonthLabel(key) {
+  const [y, m] = key.split('-');
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return MONTHS[parseInt(m, 10) - 1] + ' ' + y.slice(2);
+}
+
+// ─────────────────────────────────────────────
+// SAMPLE DATA
+// ─────────────────────────────────────────────
+const SAMPLE_CSV = `Date,Description,Amount
+01/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+01/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+01/02/2026,RENT PMT JAN 2026,-1400.00
+01/04/2026,STARBUCKS #1234,-6.75
+01/07/2026,KROGER #0456,-58.32
+01/09/2026,NETFLIX.COM,-15.49
+01/10/2026,SPOTIFY USA,-9.99
+01/12/2026,DOORDASH*PANDA EXPRESS,-24.80
+01/15/2026,AT&T WIRELESS,-75.00
+01/18/2026,AMAZON.COM*3F8H9,-42.17
+01/20/2026,SHELL OIL 12345,-52.00
+01/22/2026,WALGREENS #0789,-18.64
+01/25/2026,TARGET 00123,-67.83
+01/28/2026,ELECTRIC BILL PAYMENT,-94.00
+02/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+02/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+02/01/2026,RENT PMT FEB 2026,-1400.00
+02/05/2026,STARBUCKS #5678,-7.25
+02/08/2026,WHOLE FOODS MARKET,-112.47
+02/11/2026,UBER* TRIP,-18.40
+02/14/2026,AMC THEATER 0012,-28.50
+02/17/2026,KROGER #0456,-84.91
+02/20/2026,COMCAST CABLE,-65.00
+02/22/2026,AMAZON.COM*1A2B,-29.99
+02/26/2026,CVS/PHARMACY #1234,-34.50
+03/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+03/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+03/01/2026,RENT PMT MAR 2026,-1400.00
+03/04/2026,CHIPOTLE MEXICAN GRILL,-15.75
+03/09/2026,LYFT *RIDE SUN 10PM,-22.10
+03/12/2026,BEST BUY 00123,-189.00
+03/15/2026,TRADER JOE'S #123,-76.33
+03/19/2026,ADOBE CREATIVE CLOUD,-54.99
+03/22/2026,GOOGLE ONE MONTHLY,-2.99
+03/25/2026,IRS TREAS 310 TAX REF,1240.00
+03/28/2026,GRUBHUB*THAI KITCHEN,-31.50
+04/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+04/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+04/01/2026,RENT PMT APR 2026,-1400.00
+04/05/2026,STARBUCKS #9012,-5.95
+04/08/2026,SAFEWAY STORES 0123,-93.67
+04/12/2026,DELTA AIR LINES APR,-342.00
+04/16/2026,AIRBNB * HMXYZ8,-380.00
+04/20/2026,CHEVRON 12345,-48.50
+04/23/2026,AMAZON WEB SERVICES IN,-12.50
+04/25/2026,HOME DEPOT #0345,-67.89
+05/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+05/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+05/01/2026,RENT PMT MAY 2026,-1400.00
+05/06/2026,DUNKIN #4567,-4.85
+05/08/2026,WHOLE FOODS MARKET,-98.21
+05/12/2026,HULU 123456789,-7.99
+05/15/2026,VERIZON WIRELESS,-75.00
+05/18/2026,FIVE GUYS #0123,-18.40
+05/21/2026,TARGET 00456,-54.32
+05/24/2026,PARKING METER CITY,-12.00
+05/27/2026,INTEREST EARNED,3.42
+05/30/2026,TICKETMASTER*CONCERT,-145.00
+06/03/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+06/17/2026,DIRECT DEP PAYROLL ACME INC,3200.00
+06/01/2026,RENT PMT JUN 2026,-1400.00
+06/04/2026,STARBUCKS #3456,-6.50
+06/07/2026,DOORDASH*CHIPOTLE,-27.80
+06/10/2026,AMAZON.COM*9X8Y,-89.99
+06/14/2026,SOUTHWEST AIR JUN,-287.00
+06/18/2026,KROGER #0789,-71.45
+06/21/2026,OPENAI *CHATGPT PLUS,-20.00
+06/24/2026,APPLE.COM/BILL,-9.99
+06/27/2026,ZELLE PAYMENT TO JANE,-200.00`;
+
+function loadSampleData() {
+  isSampleData = true;
+  detectedBank = 'Sample';
+  showSection('loading');
+
+  // Small timeout so the loading state visually appears before the (instant) parse
+  setTimeout(() => {
+    try {
+      const rows = parseCSV(SAMPLE_CSV);
+      headers = rows[0].map(h => String(h).trim());
+      const dataRows = rows.slice(1);
+      const cols = detectCols(headers);
+      const txs = buildTransactions(dataRows, cols);
+      if (txs.length === 0) {
+        showError('Sample data error', 'Could not parse the built-in sample data. This is a bug — please report it.');
+        return;
+      }
+      transactions = txs;
+      showResults();
+    } catch (err) {
+      showError('Sample data error', 'Error: ' + err.message);
+    }
+  }, 300);
+}
+
+// ─────────────────────────────────────────────
+// BOOT
+// ─────────────────────────────────────────────
+initDropZone();
+</script>
+</body>
+</html>

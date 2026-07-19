@@ -1,0 +1,49 @@
+name: Bank format compatibility
+description: Report a CSV layout that StatementLens cannot read correctly.
+title: "[format] "
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never attach or paste a real statement.** Use the exact header row and completely fictional sample values only.
+  - type: input
+    id: institution
+    attributes:
+      label: Bank or card issuer
+      description: Institution name and whether this is a bank-account or credit-card export.
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized CSV fixture
+      description: Exact header plus two invented rows. Remove all names, account numbers, balances, IDs, addresses, and real merchants.
+      render: csv
+      placeholder: |
+        Transaction Date,Description,Amount
+        07/01/2026,FICTIONAL COFFEE SHOP,-4.25
+        07/02/2026,EXAMPLE PAYROLL,1200.00
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+      description: Explain the intended date, description, amount sign, and what StatementLens did instead.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and operating system
+      placeholder: Firefox 128 on Windows 11
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I confirm that every value above is fictional and contains no personal or financial data.
+          required: true
