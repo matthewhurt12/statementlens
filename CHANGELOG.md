@@ -9,6 +9,10 @@ All significant changes across the build process. Most recent first.
 First public open-source release. Source, issues, automated tests, an offline HTML
 download, and the hosted demo are available through GitHub.
 
+### Documentation
+
+- Added `FRANKIE.md`, resolving the public README link and documenting the bounded AI-assisted draft-pull-request path. It makes clear that proposals are reviewed drafts and cannot merge, release, deploy, or access financial data.
+
 ### Correctness and security
 
 - Reject invalid ISO calendar dates such as `2024-02-31` instead of accepting JavaScript's silently normalized date. Added valid-leap-day and invalid-ISO-date regressions; the suite now contains 166 checks.
