@@ -14,7 +14,7 @@ Before approving a public name:
 - Search the web, GitHub, app stores, and relevant trademark databases.
 - Check the exact domain through a registrar; a missing DNS record does not prove availability.
 - Prefer a name whose `.com`, `.app`, or `.dev` does not create product confusion.
-- Update the title, README, metadata, filenames, and Show HN draft in one pass if renamed.
+- Update the title, README, metadata, filenames, and human-written launch notes in one pass if renamed.
 
 This is a branding check, not legal clearance. Get qualified advice if the project becomes commercial.
 
@@ -141,30 +141,22 @@ The `pages.dev` URL is sufficient for private testing and even an initial develo
 Read the current Show HN and general Hacker News guidelines immediately before posting.
 Do not use a new promotion-only account, ask for votes, or coordinate comments.
 
-Suggested title:
+Hacker News currently prohibits generated or AI-edited text. Frankie is an AI agent, so no
+title, submission, or comment from Frankie or this runbook should be pasted into HN. Matthew
+must write the post himself in his own words after using the exact public build.
 
-> Show HN: StatementLens – inspect a bank CSV in one offline HTML file
+Human fact-check list before writing:
 
-Suggested body:
-
-```text
-I wanted the smallest bank-CSV sanity checker I could actually audit.
-
-StatementLens is one HTML file with no dependencies, storage, analytics, or backend.
-Its Content Security Policy blocks network connections, and the Node tests extract the
-parser directly from the shipping file instead of testing a duplicate.
-
-It shows cash flow, monthly/category charts, and a filterable transaction table, then
-exports a spreadsheet-safe categorized CSV. The constraints are intentional: CSV only,
-ephemeral, keyword categories, and US-dollar display for now.
-
-Demo: https://matthewhurt12.github.io/statementlens/
-Source: https://github.com/matthewhurt12/statementlens
-
-I would especially value feedback on the trust model and on bank layouts that fail.
-Please never share a real statement—there is an issue template for exact headers plus
-two completely fictional rows.
-```
+- The thing people can try is https://matthewhurt12.github.io/statementlens/.
+- The source is https://github.com/matthewhurt12/statementlens.
+- The release is one offline-capable HTML file with no account, backend, analytics, storage,
+  or application-initiated network requests.
+- The current logic suite contains 166 checks.
+- The intentional limits are CSV-only input, ephemeral data, transparent keyword categories,
+  and a US-dollar display.
+- The useful feedback request is trust-model criticism and safe format reports using exact
+  headers plus completely invented rows, never a real statement.
+- Disclose Matthew's relationship to the project and Frankie's AI-assisted maintenance role.
 
 The operator should be available for at least two hours after posting. Answer technical
 questions plainly, acknowledge limitations, turn specific reports into issues, and never
