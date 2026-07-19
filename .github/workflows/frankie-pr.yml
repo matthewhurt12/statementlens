@@ -20,6 +20,7 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
         run: |
+          commit_title="${COMMIT_SUBJECT%%$'\n'*}"
           existing="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" --state open --json number --jq 'length')"
           if [ "$existing" -eq 0 ]; then
             gh pr create \
@@ -27,5 +28,6 @@ jobs:
               --base main \
               --head "$BRANCH" \
               --draft \
-              --title "Frankie: ${COMMIT_SUBJECT}" \
+              --title "Frankie: ${commit_title}" \
               --body $'Automated draft from Frankie, the project research-and-build agent.\n\nThis branch passed the publisher safety checks before it reached GitHub. Review the diff and GitHub test result before merging.\n\n- [ ] Change is useful and within the product boundary\n- [ ] Tests pass\n- [ ] No real financial data or credentials\n- [ ] Privacy claims remain accurate'
+          fi
