@@ -9,7 +9,8 @@ source, save it, and run it offline.
 **[Report a bug or bank format](https://github.com/matthewhurt12/statementlens/issues/new/choose)**
 
 Created by Matthew and maintained with Frankie, an AI research-and-build agent running
-on a Raspberry Pi. The application itself contains no AI and makes no API calls.
+on a Raspberry Pi. The application itself contains no AI and makes no API calls. Read
+[`FRANKIE.md`](FRANKIE.md) for the transparent draft-pull-request publishing boundary.
 
 ## Why this project exists
 

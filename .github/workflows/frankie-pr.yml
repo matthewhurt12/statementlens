@@ -1,0 +1,31 @@
+name: Open Frankie draft PR
+
+on:
+  push:
+    branches:
+      - "frankie/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open a draft pull request when needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+        run: |
+          existing="$(gh pr list --repo "$REPOSITORY" --head "$BRANCH" --state open --json number --jq 'length')"
+          if [ "$existing" -eq 0 ]; then
+            gh pr create \
+              --repo "$REPOSITORY" \
+              --base main \
+              --head "$BRANCH" \
+              --draft \
+              --title "Frankie: ${COMMIT_SUBJECT}" \
+              --body $'Automated draft from Frankie, the project research-and-build agent.\n\nThis branch passed the publisher safety checks before it reached GitHub. Review the diff and GitHub test result before merging.\n\n- [ ] Change is useful and within the product boundary\n- [ ] Tests pass\n- [ ] No real financial data or credentials\n- [ ] Privacy claims remain accurate'
