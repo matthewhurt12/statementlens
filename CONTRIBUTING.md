@@ -48,3 +48,14 @@ requests unless the project explicitly changes its privacy model.
 - Importing and exporting fictional data causes no network request.
 - No secrets, personal data, bank data, generated artifacts, or unrelated files are included.
 - Privacy, security, and compatibility claims remain precise.
+
+## Frankie-assisted proposals
+
+Some draft pull requests may come from Frankie, the project's AI research-and-build agent.
+Those branches use the `frankie/*` prefix. A repository-scoped publisher accepts only the
+public project files, scans for common credential patterns, checks the network-blocking CSP,
+and runs the logic suite before pushing. GitHub Actions then runs the tests again.
+
+Treat these as proposals, not trusted automation: review the diff, evidence, test result, and
+privacy claims exactly as you would for any other contribution. See `FRANKIE.md` for the full
+publishing boundary.
